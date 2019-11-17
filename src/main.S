@@ -1,7 +1,10 @@
 .section .data
 
-msg: .ascii "PLEASE enter a SINGLE sentence: "
+msg: .ascii "PLEASE enter your name: "
 .equ len,.-msg
+
+msg2: .ascii "Error no special characters allowed: "
+.equ len2,.-msg2
 
 .text
 
@@ -10,19 +13,19 @@ msg: .ascii "PLEASE enter a SINGLE sentence: "
 _start:
 	pushq %rbp
 	movq %rsp, %rbp #function prologue
-	
+
 	movl $1, %eax
 	movl $1, %edi
 	leaq msg, %rsi
 	movl $len, %edx
 	syscall #prints msg
-	
+
+inputname:	
 	movl $0, %eax
 	movl $0, %edi
 	leaq -64(%rbp), %rsi
 	movl $56, %edx
 	syscall #reads input
-	
 	movq %rax, %r10 #number of character
 	leaq -64(%rbp), %rcx #move pointer to rcx
 	
@@ -47,8 +50,18 @@ less3:
 	jae change
 	jmp loope #check if character is above 7B ({), otherwise jumps to loope
 change:
-	movb $'*', (%rcx) #changes character rcx is pointing to to "*"
+	movl $1, %eax
+	movl $1, %edi
+	leaq msg2, %rsi
+	movl $len2, %edx
+	syscall #prints msg
+	jmp inputname
 loope:
+	cmpq $0, %r9
+	ja loope2
+	andl $0xFFFFFFDF, (%rcx)
+	incq %r9
+loope2:
 	incq %rcx #increases pointer by 1 character
 	cmpq %rcx, %rbp
 	jae loop #check if rcx passes rbp, if not loops, if it does loops out
@@ -62,4 +75,3 @@ loope:
 	pop %rbp #function epilogue
 	movl $60, %eax
 	syscall #exit
-
