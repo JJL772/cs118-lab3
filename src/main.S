@@ -1,10 +1,51 @@
 .section .data
 
+# First message to prompt for name
 msg: .ascii "PLEASE enter your name: "
 .equ len,.-msg
 
+# Second message to display an error
 msg2: .ascii "Error no special characters allowed: "
 .equ len2,.-msg2
+
+# Prompt for first number
+num1_msg: .ascii "Please enter the first number: "
+.equ num1_msg_len,.-num1_msg 
+
+# Prompt for second number
+num2_msg: .ascii "Please enter the second number: "
+.equ num2_msg_len,.-num2_msg
+
+# Message for the sum of the two integers
+sum_msg: .ascii "The sum of your two integers is: "
+.equ sum_msg_len,.-sum_msg
+
+# Messsage for the sub message
+sub_msg: .ascii "The difference of your two integers is: "
+.equ sub_msg_len,.-sub_msg
+
+# Product message
+prod_msg: .ascii "The product of your two integers is: "
+.equ prod_msg_len,.-prod_msg
+
+# Multiplication overflow!
+mul_overflow: .ascii "Your two integers would have caused an overflow!"
+.equ mul_overflow_len,.-mul_overflow
+
+# Message for division
+div_msg: .ascii "The quotient of your two integers is: "
+.equ div_msg_len,.-div_msg
+
+# Message for division error 
+div_zero: .ascii "Error while dividing: the divisor is 0!"
+.equ div_zero_len,.-div_zero
+
+# Message for y/n prompt
+yn_msg: .ascii " (y/N): "
+.equ yn_msg_len,.-yn_msg
+
+number1: .quad 0
+number2: .quad 0
 
 .text
 
@@ -70,11 +111,204 @@ loope2:
 	movl $1, %edi
 	leaq -64(%rbp), %rsi
 	syscall #echos sentence with character changes
+	
+	#=================================#
+	# Ask the user for the numbers
+	#=================================#
+	movl $1, %eax
+	movl $1, %edi
+	leaq num1_msg, %rsi
+	movq $num1_msg_len, %rdx
+	syscall
+
+	# Read the first number from the user
+	call readnum
+	movq %rax, number1
+
+	# Ask for the second number
+	movl $1, %eax
+	movl $1, %edi
+	leaq num2_msg, %rsi
+	movq $num2_msg_len, %rdx
+	syscall
+
+	# Read the second number from the user
+	call readnum
+	movq %rax, number2
+
+	#=================================#
+	# Print out the sum of the integers
+	#=================================#
+	movl $1, %eax
+	movl $1, %edi 
+	leaq sum_msg, %rsi
+	movq $sum_msg_len, %rdx
+	syscall
+
+	# Now actually add the numbers
+	movq number1, %rax
+	movq number2, %rbx
+	addq %rbx, %rax
+
+	# Call our printing routine
+	call printnum
+
+	# Inject a newline
+	call newline
+
+	#=================================#
+	# Print out the difference of the
+	# integers
+	#=================================#
+	movl $1, %eax
+	movl $1, %edi
+	leaq sub_msg, %rsi
+	movq $sub_msg_len, %rdx
+	syscall
+
+	# Perform the subtract
+	movq number1, %rax
+	movq number2, %rbx
+	subq %rbx, %rax
+
+	# Call the print
+	call printnum
+
+	# Inject newline
+	call newline
+
+	#=================================#
+	# Print out the product
+	#=================================#
+	movl $1, %eax
+	movl $1, %edi
+	leaq prod_msg, %rsi
+	movq $prod_msg_len, %rdx
+	syscall
+
+	# Perform the multiplication
+	movq number1, %rax
+	movq number2, %rbx 
+	mulq %rbx
+	# Check if there are any overflow-like conditions, if not, let's continue
+	jbe .mul_ovf 
+	jmp .div
+
+
+.mul_ovf:
+	movl $1, %eax
+	movl $1, %edi
+	leaq mul_overflow, %rsi
+	movq $mul_overflow_len, %rdx
+	syscall
+
+.div:
+	#=================================#
+	# Print out the quotient/remainder
+	#=================================#
+	movl $1, %eax
+	movl $1, %edi
+	leaq div_msg, %rsi
+	movq $div_msg_len, %rdx
+	syscall
+
+	# Load the numbers again
+	movq number1, %rax
+	movq number2, %rbx
+
+	# Check that the divisor is not zero
+	cmp $0, %rbx
+	je .big_error
+
+.big_error:
+	movl $1, %eax
+	movl $1, %edi
+	leaq div_zero, %rsi
+	movq $div_zero_len, %rdx
+	syscall
+
+
+
+
 	jmp exit
+
+# Print out a y/n prompt with the message in rdi, len is in rsi
+# Return 1 in al if the user put Y, else 0
+yn_prompt:
+	pushq %rbp
+	movq %rsp, %rbp
+	
+	# Print out the user specific prompt 
+	movl $1, %eax
+	movq %rsi, %rdx
+	movq %rdi, %rsi
+	movl $1, %edi 
+	syscall
+
+	# Print out the y/n prompt
+	movl $1, %eax
+	movl $1, %edi
+	leaq yn_msg, %rsi
+	movq $yn_msg_len, %rdx
+	syscall
+
+	# Get one char from stdin
+	call getch
+
+	# Convert to upper and compare
+	orb $0x40, %al
+	cmp $'Y', %al
+	# If user entered y, then return 1
+	je .yes_yn_prompt
+	# Else, return 0
+	movb $0, %al
+	jmp .done_yn_prompt
+	
+.yes_yn_prompt:
+	movb $1, %al
+.done_yn_prompt:
+	popq %rbp 
+	ret
+
+# getch aka getchar
+getch:
+	pushq %rbp
+	movq %rsp, %rbp
+
+	# Read a single letter from the command line
+	# We actually read into a giant prompt here since it's a good idea
+	# to not leave stuff in the input buffer
+	movl $0, %eax
+	movl $0, %edi
+	movl $128, %edx
+	leaq -128(%rbp), %rsi
+	syscall 
+
+	# Store the value we just grabbed
+	movb -128(%rbp), %al
+
+	pop %rbp
+	ret
+
+# Simply prints a newline 
+newline:
+	pushq %rbp
+	movq %rsp, %rbp 
+
+	# Just print a newline
+	movl $1, %eax
+	movl $1, %edi
+	movl $1, %edx
+	movb $0xa, -1(%rbp)
+	leaq -1(%rbp), %rsi
+	syscall
+
+	popq %rbp
+	ret 
 
 # Function to read a number
 readnum:
-	pushq %rsp
+	pushq %rbp
 	movq %rsp, %rbp
 
 	movl $0, %eax
@@ -84,13 +318,24 @@ readnum:
 	syscall
 
 	leaq -128(%rbp), %rsi
+	cmp $'-', %rsi
+	jne .cont
+	addq $1, %rsi
+	movq $1, %r15
+.cont:
+	xorq %r15, %r15
 	addq %rax, %rsi
-	#decq %rsi
 	movq %rax, %r10 # This will be used as a counter
-	movq $1, %r13
+	movq $10, %r13
 	xorl %eax, %eax
 	xorl %ecx, %ecx
 	movb (%rsi), %al
+	subb $0x30, %al
+	addq %rax, %rcx
+	decq %rsi
+	decq %r10
+	movb (%rsi), %al
+	subb $0x30, %al
 .numloop:
 	mulq %r13
 	addq %rax, %rcx
@@ -102,11 +347,17 @@ readnum:
 	movq $10, %r12
 	mulq %r12
 	movq %rax, %r13
-	xorl %eax, %eax
+	movl $0, %eax
 	movb (%rsi), %al
+	subb $0x30, %al
 	jmp .numloop
 
 .done:
+	# Actually not done, just need to see if it was negative
+	cmpq $1, %r15
+	jne .reallydone
+	negq %rcx
+.reallydone:
 	movq %rcx, %rax
 
 
