@@ -9,8 +9,12 @@ msg: .ascii "PLEASE enter your name: "
 .equ len,.-msg
 
 # Second message to display an error
-msg2: .ascii "Error no special characters allowed: "
+msg2: .ascii "\rError no special characters allowed: "
 .equ len2,.-msg2
+
+# Greeting Message
+msg3: .ascii "Hello there, "
+.equ len3,.-msg3
 
 # Prompt for first number
 num1_msg: .ascii "Please enter the first number: "
@@ -41,7 +45,7 @@ div_msg: .ascii "The quotient of your two integers is: "
 .equ div_msg_len,.-div_msg
 
 # Message for division error 
-div_zero: .ascii "Error while dividing: the divisor is 0!"
+div_zero: .ascii "\rError while dividing: the divisor is 0!"
 .equ div_zero_len,.-div_zero
 
 # Message for remainder
@@ -68,13 +72,18 @@ _start:
 	leaq msg, %rsi
 	movl $len, %edx
 	syscall #prints msg
-
+	
 inputname:	
 	movl $0, %eax
 	movl $0, %edi
 	leaq -64(%rbp), %rsi
 	movl $56, %edx
 	syscall #reads input
+	movl $1, %eax
+	movl $1, %edi
+	leaq msg3, %rsi
+	movl $len3, %edx
+	syscall #prints msg
 	movq %rax, %r10 #number of character
 	leaq -64(%rbp), %rcx #move pointer to rcx
 	
@@ -131,7 +140,9 @@ wow_begin_very_cool:
 	syscall
 
 	# Read the first number from the user
+	subq $128, %rsp
 	call readnum
+	addq $128, %rsp
 	movq %rax, number1
 
 	# Ask for the second number
@@ -142,7 +153,9 @@ wow_begin_very_cool:
 	syscall
 
 	# Read the second number from the user
+	subq $128, %rsp
 	call readnum
+	addq $128, %rsp
 	movq %rax, number2
 
 	#=================================#
@@ -160,11 +173,15 @@ wow_begin_very_cool:
 	addq %rbx, %rax
 
 	# Call our printing routine
+	subq $128, %rsp
 	call printnum
+	addq $128, %rsp
 
 	# Inject a newline
+	subq $128, %rsp
 	call newline
-
+	addq $128, %rsp
+	
 	#=================================#
 	# Print out the difference of the
 	# integers
@@ -181,11 +198,15 @@ wow_begin_very_cool:
 	subq %rbx, %rax
 
 	# Call the print
+	subq $128, %rsp
 	call printnum
-
+	addq $128, %rsp
+	
 	# Inject newline
+	subq $128, %rsp
 	call newline
-
+	addq $128, %rsp
+	
 	#=================================#
 	# Print out the product
 	#=================================#
@@ -204,9 +225,12 @@ wow_begin_very_cool:
 	# Check if there are any overflow-like conditions, if not, let's continue
 	jbe .mul_ovf 
 
+	subq $128, %rsp
 	call printnum
+	addq $128, %rsp
+	subq $128, %rsp
 	call newline
-
+	addq $128, %rsp
 	jmp .div
 
 .mul_ovf:
@@ -237,11 +261,15 @@ wow_begin_very_cool:
 	# Perform the division
 	cltd
 	idivl %ebx
-	movl %edx, -16(%rbp)
+	pushq %rdx
 
 	# Print remainder
+	subq $128, %rsp
 	call printnum
+	addq $128, %rsp
+	subq $128, %rsp
 	call newline
+	addq $128, %rsp
 
 	# Print remainder
 	movl $1, %eax
@@ -249,10 +277,14 @@ wow_begin_very_cool:
 	leaq rem_msg, %rsi
 	movq $rem_msg_len, %rdx
 	syscall
-
+	
+	popq %rax
+	subq $128, %rsp
 	call printnum
+	addq $128, %rsp
+	subq $128, %rsp
 	call newline
-
+	addq $128, %rsp
 	jmp exit
 
 .big_error:
@@ -261,9 +293,9 @@ wow_begin_very_cool:
 	leaq div_zero, %rsi
 	movq $div_zero_len, %rdx
 	syscall
-	
+	subq $128, %rsp
 	call newline # Inject newline
-
+	addq $128, %rsp
 	jmp exit
 
 # Print out a y/n prompt with the message in rdi, len is in rsi
@@ -287,7 +319,9 @@ yn_prompt:
 	syscall
 
 	# Get one char from stdin
+	subq $128, %rsp
 	call getch
+	addq $128, %rsp
 
 	# Convert to upper and compare
 	orb $0x40, %al
@@ -328,7 +362,6 @@ getch:
 newline:
 	pushq %rbp
 	movq %rsp, %rbp 
-
 	# Just print a newline
 	movl $1, %eax
 	movl $1, %edi
@@ -336,7 +369,6 @@ newline:
 	movb $0xa, -1(%rbp)
 	leaq -1(%rbp), %rsi
 	syscall
-
 	popq %rbp
 	ret 
 
@@ -352,7 +384,6 @@ readnum:
 	syscall
 
 	subq $1, %rax 
-	movq %rbp, %rsi
 	leaq -128(%rbp), %rsi
 	cmpb $'-', 1(%rsi)
 	jne .cont
@@ -362,7 +393,6 @@ readnum:
 .cont:
 	addq %rax, %rsi
 	movq %rax, %r10 # This will be used as a counter
-	movq $10, %r13
 	# Perform an xor to clear the regs
 	xorl %eax, %eax
 	xorl %ecx, %ecx
@@ -407,12 +437,10 @@ readnum:
 printnum:
 	pushq %rbp
 	movq %rsp, %rbp
-	xorl %edx, %edx 
 	# Clear rdx
-	xorl %edx, %edx
+	xorl %edx, %edx 
 	# Move 10 to rbx 
 	movq $10, %rbx
-	# We'll put the string at rbp-32
 	movq %rbp, %rcx
 	decq %rcx 
 	xorq %r15, %r15 
@@ -454,7 +482,9 @@ printnum:
 exit:
 	leaq cont_msg, %rdi
 	movq $cont_msg_len, %rsi
+	subq $128, %rsp
 	call yn_prompt
+	addq $128, %rsp
 
 	# Continue if result is 1
 	cmp $1, %rax 
