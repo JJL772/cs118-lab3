@@ -70,7 +70,96 @@ loope2:
 	movl $1, %edi
 	leaq -64(%rbp), %rsi
 	syscall #echos sentence with character changes
-	
+	jmp exit
+
+# Function to read a number
+readnum:
+	pushq %rsp
+	movq %rsp, %rbp
+
+	movl $0, %eax
+	movl $0, %edi
+	leaq -128(%rbp), %rsi
+	movl $127, %edx
+	syscall
+
+	leaq -128(%rbp), %rsi
+	addq %rax, %rsi
+	#decq %rsi
+	movq %rax, %r10 # This will be used as a counter
+	movq $1, %r13
+	xorl %eax, %eax
+	xorl %ecx, %ecx
+	movb (%rsi), %al
+.numloop:
+	mulq %r13
+	addq %rax, %rcx
+	cmp $0, %r10
+	je .done
+	decq %r10
+	decq %rsi
+	movq %r13, %rax
+	movq $10, %r12
+	mulq %r12
+	movq %rax, %r13
+	xorl %eax, %eax
+	movb (%rsi), %al
+	jmp .numloop
+
+.done:
+	movq %rcx, %rax
+
+
+	popq %rbp
+	ret
+
+# Function to print a number,
+# The number to print is in rax
+printnum:
+	pushq %rbp
+	movq %rsp, %rbp
+
+	xorl %edx, %edx
+	movq $10, %rbx
+	# We'll put the string at rbp-32
+	movq %rbp, %rcx
+	decq %rcx
+
+.printloop:
+	cltd
+	movq $10, %r14
+	movq %rax, %r13
+	divq %r14
+	addb $0x30, %dl
+	movb %dl, (%rcx)
+	movq %r13, %rax
+	cltd
+	divq %rbx
+	cmpl $0, %eax
+	je .doprint
+	decq %rcx
+	movq %rax, %r10
+	movq %rbx, %rax
+	movq %rax, %rbx
+	movq %r10, %rax
+	jmp .printloop
+
+.doprint:
+	movl $1, %eax
+	movl $1, %edi
+	leaq (%rcx), %rsi
+	movq %rbp, %r10
+	subq %rcx, %r10
+	movq %r10, %rdx
+	syscall
+
+	popq %rbp
+	ret
+
+exit:
+	call readnum
+	call printnum
+
 	movq %rbp, %rsp
 	pop %rbp #function epilogue
 	movl $60, %eax
