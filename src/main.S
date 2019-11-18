@@ -1,5 +1,9 @@
 .section .data
 
+# Message used to ask for a contiue or not
+cont_msg: .ascii "Would you like to do this again?"
+.equ cont_msg_len,.-cont_msg
+
 # First message to prompt for name
 msg: .ascii "PLEASE enter your name: "
 .equ len,.-msg
@@ -39,6 +43,10 @@ div_msg: .ascii "The quotient of your two integers is: "
 # Message for division error 
 div_zero: .ascii "Error while dividing: the divisor is 0!"
 .equ div_zero_len,.-div_zero
+
+# Message for remainder
+rem_msg: .ascii "The remainder between your two integers is: "
+.equ rem_msg_len,.-rem_msg
 
 # Message for y/n prompt
 yn_msg: .ascii " (y/N): "
@@ -111,7 +119,8 @@ loope2:
 	movl $1, %edi
 	leaq -64(%rbp), %rsi
 	syscall #echos sentence with character changes
-	
+
+wow_begin_very_cool:
 	#=================================#
 	# Ask the user for the numbers
 	#=================================#
@@ -189,11 +198,15 @@ loope2:
 	# Perform the multiplication
 	movq number1, %rax
 	movq number2, %rbx 
-	mulq %rbx
+	imulq %rbx
+
 	# Check if there are any overflow-like conditions, if not, let's continue
 	jbe .mul_ovf 
-	jmp .div
 
+	call printnum
+	call newline
+
+	jmp .div
 
 .mul_ovf:
 	movl $1, %eax
@@ -220,6 +233,27 @@ loope2:
 	cmp $0, %rbx
 	je .big_error
 
+	# Perform the division
+	cltd
+	idivq %rbx
+	movl %edx, -16(%rbp)
+
+	# Print remainder
+	call printnum
+	call newline
+
+	# Print remainder
+	movl $1, %eax
+	movl $1, %edi
+	leaq rem_msg, %rsi
+	movq $rem_msg_len, %rdx
+	syscall
+
+	call printnum
+	call newline
+
+	jmp exit
+
 .big_error:
 	movl $1, %eax
 	movl $1, %edi
@@ -227,8 +261,9 @@ loope2:
 	movq $div_zero_len, %rdx
 	syscall
 
-
-
+	leaq cont_msg, %rdi
+	movq $cont_msg_len, %rsi 
+	call yn_prompt
 
 	jmp exit
 
@@ -313,41 +348,46 @@ readnum:
 
 	movl $0, %eax
 	movl $0, %edi
-	leaq -128(%rbp), %rsi
+	leaq -127(%rbp), %rsi
 	movl $127, %edx
 	syscall
 
+	subq $1, %rax
+	movq %rbp, %rsi
 	leaq -128(%rbp), %rsi
 	cmp $'-', %rsi
 	jne .cont
 	addq $1, %rsi
 	movq $1, %r15
 .cont:
-	xorq %r15, %r15
 	addq %rax, %rsi
 	movq %rax, %r10 # This will be used as a counter
 	movq $10, %r13
+	# Perform an xor to clear the regs
 	xorl %eax, %eax
 	xorl %ecx, %ecx
-	movb (%rsi), %al
-	subb $0x30, %al
-	addq %rax, %rcx
-	decq %rsi
-	decq %r10
+	movq $1, %r13 
 	movb (%rsi), %al
 	subb $0x30, %al
 .numloop:
+	decq %r10
+	# Multiply the value in al by r13
 	mulq %r13
+	# Add it to rcx
 	addq %rax, %rcx
+	# If the counter is zero, we're done
 	cmp $0, %r10
 	je .done
-	decq %r10
+	# Decrement counter & rsi
+	#decq %r10
 	decq %rsi
+	# Do a multiplication of r13 * 10
 	movq %r13, %rax
 	movq $10, %r12
 	mulq %r12
 	movq %rax, %r13
 	movl $0, %eax
+	# Get the next char ready
 	movb (%rsi), %al
 	subb $0x30, %al
 	jmp .numloop
@@ -356,6 +396,7 @@ readnum:
 	# Actually not done, just need to see if it was negative
 	cmpq $1, %r15
 	jne .reallydone
+	# Two's complement of rcx
 	negq %rcx
 .reallydone:
 	movq %rcx, %rax
@@ -369,33 +410,41 @@ readnum:
 printnum:
 	pushq %rbp
 	movq %rsp, %rbp
-
+	xorl %edx, %edx 
+	# Clear rdx
 	xorl %edx, %edx
+	# Move 10 to rbx 
 	movq $10, %rbx
 	# We'll put the string at rbp-32
 	movq %rbp, %rcx
-	decq %rcx
-
+	decq %rcx 
+	xorq %r15, %r15 
+	# Sign extend and check if negative
+	cmpl $0, %eax
+	jge .printloop
+	# So it's negative...
+	negq %rax
+	movq $1, %r15 
 .printloop:
 	cltd
 	movq $10, %r14
-	movq %rax, %r13
-	divq %r14
+	divq %r14 
 	addb $0x30, %dl
 	movb %dl, (%rcx)
-	movq %r13, %rax
-	cltd
-	divq %rbx
+	xorl %edx, %edx
+	# If the quotient is zero, stop
 	cmpl $0, %eax
 	je .doprint
 	decq %rcx
-	movq %rax, %r10
-	movq %rbx, %rax
-	movq %rax, %rbx
-	movq %r10, %rax
 	jmp .printloop
 
 .doprint:
+	# Handle if negative
+	cmpq $0, %r15
+	je .finishprint
+	decq %rcx 
+	movb $'-', (%rcx)
+.finishprint:
 	movl $1, %eax
 	movl $1, %edi
 	leaq (%rcx), %rsi
@@ -408,8 +457,13 @@ printnum:
 	ret
 
 exit:
-	call readnum
-	call printnum
+	leaq cont_msg, %rdi
+	movq $cont_msg_len, %rsi
+	call yn_prompt
+
+	# Continue if result is 1
+	cmp $1, %rax 
+	je wow_begin_very_cool
 
 	movq %rbp, %rsp
 	pop %rbp #function epilogue
