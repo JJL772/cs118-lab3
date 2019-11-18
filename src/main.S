@@ -198,6 +198,7 @@ wow_begin_very_cool:
 	# Perform the multiplication
 	movq number1, %rax
 	movq number2, %rbx 
+	cltq
 	imulq %rbx
 
 	# Check if there are any overflow-like conditions, if not, let's continue
@@ -235,7 +236,7 @@ wow_begin_very_cool:
 
 	# Perform the division
 	cltd
-	idivq %rbx
+	idivl %ebx
 	movl %edx, -16(%rbp)
 
 	# Print remainder
@@ -260,10 +261,8 @@ wow_begin_very_cool:
 	leaq div_zero, %rsi
 	movq $div_zero_len, %rdx
 	syscall
-
-	leaq cont_msg, %rdi
-	movq $cont_msg_len, %rsi 
-	call yn_prompt
+	
+	call newline # Inject newline
 
 	jmp exit
 
@@ -292,7 +291,7 @@ yn_prompt:
 
 	# Convert to upper and compare
 	orb $0x40, %al
-	cmp $'Y', %al
+	cmp $'y', %al
 	# If user entered y, then return 1
 	je .yes_yn_prompt
 	# Else, return 0
@@ -345,19 +344,20 @@ newline:
 readnum:
 	pushq %rbp
 	movq %rsp, %rbp
-
+	xorq %r15, %r15
 	movl $0, %eax
 	movl $0, %edi
 	leaq -127(%rbp), %rsi
 	movl $127, %edx
 	syscall
 
-	subq $1, %rax
+	subq $1, %rax 
 	movq %rbp, %rsi
 	leaq -128(%rbp), %rsi
-	cmp $'-', %rsi
+	cmpb $'-', 1(%rsi)
 	jne .cont
 	addq $1, %rsi
+	subq $1, %rax
 	movq $1, %r15
 .cont:
 	addq %rax, %rsi
@@ -391,7 +391,6 @@ readnum:
 	movb (%rsi), %al
 	subb $0x30, %al
 	jmp .numloop
-
 .done:
 	# Actually not done, just need to see if it was negative
 	cmpq $1, %r15
@@ -400,8 +399,6 @@ readnum:
 	negq %rcx
 .reallydone:
 	movq %rcx, %rax
-
-
 	popq %rbp
 	ret
 
@@ -437,7 +434,6 @@ printnum:
 	je .doprint
 	decq %rcx
 	jmp .printloop
-
 .doprint:
 	# Handle if negative
 	cmpq $0, %r15
@@ -452,7 +448,6 @@ printnum:
 	subq %rcx, %r10
 	movq %r10, %rdx
 	syscall
-
 	popq %rbp
 	ret
 
