@@ -41,7 +41,7 @@ toobig: .ascii "That number is too big! Please try again: "
 .equ toobig_len,.-toobig
 
 # Multiplication overflow!
-mul_overflow: .ascii "Your two integers would have caused an overflow!"
+mul_overflow: .ascii "Your two integers would have caused an overflow. The result is incorrect.\n"
 .equ mul_overflow_len,.-mul_overflow
 
 # Message for division
@@ -214,7 +214,7 @@ wow_begin_very_cool:
 	movq number2, %rbx 
 	cltq
 	xorl %edx, %edx 
-	mulq %rbx
+	imull %ebx
 
 	# Check if there are any overflow-like conditions, if not, let's continue
 	cmp $0, %edx 
