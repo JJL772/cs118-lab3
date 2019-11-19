@@ -36,6 +36,10 @@ sub_msg: .ascii "The difference of your two integers is: "
 prod_msg: .ascii "The product of your two integers is: "
 .equ prod_msg_len,.-prod_msg
 
+# Too big number
+toobig: .ascii "That number is too big! Please try again: "
+.equ toobig_len,.-toobig
+
 # Multiplication overflow!
 mul_overflow: .ascii "Your two integers would have caused an overflow!"
 .equ mul_overflow_len,.-mul_overflow
@@ -113,6 +117,7 @@ change:
 	leaq msg2, %rsi
 	movl $len2, %edx
 	syscall #prints msg
+	movq $0, -64(%rbp)
 	jmp inputname
 loope:
 	cmpq $0, %r9
@@ -140,9 +145,7 @@ wow_begin_very_cool:
 	syscall
 
 	# Read the first number from the user
-	subq $128, %rsp
 	call readnum
-	addq $128, %rsp
 	movq %rax, number1
 
 	# Ask for the second number
@@ -153,9 +156,7 @@ wow_begin_very_cool:
 	syscall
 
 	# Read the second number from the user
-	subq $128, %rsp
 	call readnum
-	addq $128, %rsp
 	movq %rax, number2
 
 	#=================================#
@@ -173,14 +174,10 @@ wow_begin_very_cool:
 	addq %rbx, %rax
 
 	# Call our printing routine
-	subq $128, %rsp
 	call printnum
-	addq $128, %rsp
 
 	# Inject a newline
-	subq $128, %rsp
 	call newline
-	addq $128, %rsp
 	
 	#=================================#
 	# Print out the difference of the
@@ -198,14 +195,10 @@ wow_begin_very_cool:
 	subq %rbx, %rax
 
 	# Call the print
-	subq $128, %rsp
 	call printnum
-	addq $128, %rsp
 	
 	# Inject newline
-	subq $128, %rsp
 	call newline
-	addq $128, %rsp
 	
 	#=================================#
 	# Print out the product
@@ -220,17 +213,15 @@ wow_begin_very_cool:
 	movq number1, %rax
 	movq number2, %rbx 
 	cltq
-	imulq %rbx
+	xorl %edx, %edx 
+	mulq %rbx
 
 	# Check if there are any overflow-like conditions, if not, let's continue
-	jbe .mul_ovf 
+	cmp $0, %edx 
+	jne .mul_ovf 
 
-	subq $128, %rsp
 	call printnum
-	addq $128, %rsp
-	subq $128, %rsp
 	call newline
-	addq $128, %rsp
 	jmp .div
 
 .mul_ovf:
@@ -264,12 +255,8 @@ wow_begin_very_cool:
 	pushq %rdx
 
 	# Print remainder
-	subq $128, %rsp
 	call printnum
-	addq $128, %rsp
-	subq $128, %rsp
 	call newline
-	addq $128, %rsp
 
 	# Print remainder
 	movl $1, %eax
@@ -278,13 +265,9 @@ wow_begin_very_cool:
 	movq $rem_msg_len, %rdx
 	syscall
 	
-	popq %rax
-	subq $128, %rsp
-	call printnum
-	addq $128, %rsp
-	subq $128, %rsp
-	call newline
-	addq $128, %rsp
+	popq %rax 
+	call printnum  
+	call newline 
 	jmp exit
 
 .big_error:
@@ -292,10 +275,8 @@ wow_begin_very_cool:
 	movl $1, %edi
 	leaq div_zero, %rsi
 	movq $div_zero_len, %rdx
-	syscall
-	subq $128, %rsp
+	syscall 
 	call newline # Inject newline
-	addq $128, %rsp
 	jmp exit
 
 # Print out a y/n prompt with the message in rdi, len is in rsi
@@ -319,9 +300,7 @@ yn_prompt:
 	syscall
 
 	# Get one char from stdin
-	subq $128, %rsp
-	call getch
-	addq $128, %rsp
+	call getch 
 
 	# Convert to upper and compare
 	orb $0x40, %al
@@ -370,12 +349,25 @@ newline:
 	leaq -1(%rbp), %rsi
 	syscall
 	popq %rbp
-	ret 
+	ret
+
+# String pointer in rsi, length in rdi
+print:
+	pushq %rbp
+	movq %rsp, %rbp
+	# Print
+	movl $1, %eax
+	movl %edi, %edx 
+	movl $1, %edi
+	syscall 
+	popq %rbp
+	ret
 
 # Function to read a number
 readnum:
 	pushq %rbp
 	movq %rsp, %rbp
+.restart:
 	xorq %r15, %r15
 	movl $0, %eax
 	movl $0, %edi
@@ -404,7 +396,8 @@ readnum:
 	# Multiply the value in al by r13
 	mulq %r13
 	# Add it to rcx
-	addq %rax, %rcx
+	addl %eax, %ecx
+	jc .toobig
 	# If the counter is zero, we're done
 	cmp $0, %r10
 	je .done
@@ -432,6 +425,13 @@ readnum:
 	popq %rbp
 	ret
 
+.toobig:
+	movl $1, %eax
+	movl $1, %ebx
+	movl $toobig_len, %edx
+	leaq toobig, %rsi
+	syscall
+	jmp .restart
 # Function to print a number,
 # The number to print is in rax
 printnum:
@@ -451,7 +451,6 @@ printnum:
 	negq %rax
 	movq $1, %r15 
 .printloop:
-	cltd
 	movq $10, %r14
 	divq %r14 
 	addb $0x30, %dl
