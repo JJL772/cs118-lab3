@@ -41,7 +41,7 @@ toobig: .ascii "That number is too big! Please try again: "
 .equ toobig_len,.-toobig
 
 # Multiplication overflow!
-mul_overflow: .ascii "Your two integers would have caused an overflow. The result is incorrect.\n"
+mul_overflow: .ascii "\rYour two integers would have caused an overflow for the product. The result is incorrect.\n"
 .equ mul_overflow_len,.-mul_overflow
 
 # Message for division
