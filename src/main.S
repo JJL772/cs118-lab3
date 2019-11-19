@@ -5,11 +5,11 @@ cont_msg: .ascii "Would you like to do this again?"
 .equ cont_msg_len,.-cont_msg
 
 # First message to prompt for name
-msg: .ascii "PLEASE enter your name: "
+msg: .ascii "Please enter your name: "
 .equ len,.-msg
 
 # Second message to display an error
-msg2: .ascii "\rError no special characters allowed: "
+msg2: .ascii "\rError no special characters allowed. Please re-enter your name: "
 .equ len2,.-msg2
 
 # Greeting Message
