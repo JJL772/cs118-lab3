@@ -87,7 +87,7 @@ inputname:
 	movl $1, %edi
 	leaq msg3, %rsi
 	movl $len3, %edx
-	syscall #prints msg
+	syscall #prints msg3
 	movq %rax, %r10 #number of character
 	leaq -64(%rbp), %rcx #move pointer to rcx
 	
@@ -116,14 +116,14 @@ change:
 	movl $1, %edi
 	leaq msg2, %rsi
 	movl $len2, %edx
-	syscall #prints msg
+	syscall #prints error msg
 	movq $0, -64(%rbp)
 	jmp inputname
 loope:
-	cmpq $0, %r9
-	ja loope2
-	andl $0xFFFFFFDF, (%rcx)
-	incq %r9
+	cmpq $0, %r9 #r9 is used as a counter, if it passes 0, jumps to loope2
+	ja loope2 
+	andl $0xFFFFFFDF, (%rcx) #sets the character to be capitalized
+	incq %r9 #r9 is set to 1 to set counter
 loope2:
 	incq %rcx #increases pointer by 1 character
 	cmpq %rcx, %rbp
